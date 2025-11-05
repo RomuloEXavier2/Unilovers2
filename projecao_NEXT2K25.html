@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualização da IA de Paletização</title>
+    <style>
+        /* CSS Reset e Configuração Base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0d1117; /* Cor de fundo escura */
+            color: #c9d1d9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Contêiner principal da simulação */
+        .simulation-container {
+            display: flex;
+            flex-direction: row;
+            gap: 40px;
+            padding: 40px;
+            width: 95vw;
+            height: 95vh;
+            max-width: 1400px;
+            align-items: center;
+            justify-content: center;
+            background-color: #161b22;
+            border-radius: 20px;
+            border: 1px solid #30363d;
+        }
+
+        /* Coluna da Esquerda (Pallet e Status) */
+        .left-column {
+            flex-basis: 60%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 30px;
+        }
+
+        /* Coluna da Direita (Fila de Peças) */
+        .right-column {
+            flex-basis: 40%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #0d1117;
+            border-radius: 15px;
+            border: 1px solid #30363d;
+        }
+
+        /* ----- Seção de Status ----- */
+        #status-display {
+            width: 100%;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        #status-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #58a6ff; /* Azul */
+            margin-bottom: 10px;
+        }
+
+        #status-text {
+            font-size: 1.2rem;
+            color: #c9d1d9;
+        }
+
+        /* Cores de Status */
+        #status-display.problem { border-left: 5px solid #f85149; } /* Vermelho */
+        #status-display.calculating { border-left: 5px solid #db6d28; } /* Laranja */
+        #status-display.success { border-left: 5px solid #3fb950; } /* Verde */
+
+        /* ----- Seção do Pallet (Grade 5x5) ----- */
+        .pallet-container {
+            width: 100%;
+            max-width: 600px; /* Tamanho máximo do pallet */
+            aspect-ratio: 1 / 1; /* Mantém quadrado */
+            position: relative;
+        }
+        
+        #pallet-grid {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            border: 3px solid #58a6ff;
+            background-color: #0d1117;
+            border-radius: 5px;
+            padding: 5px;
+            gap: 5px;
+        }
+
+        /* Célula base da grade (visual) */
+        .grid-cell {
+            background-color: #161b22;
+            border-radius: 2px;
+        }
+        
+        /* Onde as peças serão colocadas */
+        #pallet-pieces {
+            position: absolute;
+            top: 5px; left: 5px; right: 5px; bottom: 5px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 5px;
+        }
+
+        /* ----- Seção da Fila (Direita) ----- */
+        #queue-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #58a6ff;
+            border-bottom: 2px solid #30363d;
+            padding-bottom: 10px;
+            width: 100%;
+            text-align: center;
+        }
+
+        #queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            align-items: center;
+        }
+
+        /* ----- Peças (Blocos) ----- */
+        .block {
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #ffffff;
+            opacity: 0; /* Começa invisível */
+            transition: all 0.5s ease;
+        }
+        
+        /* Tipos de blocos (Tamanhos e Cores) */
+        .block-2x1 {
+            grid-column: span 2;
+            grid-row: span 1;
+            background-color: #238636; /* Verde */
+        }
+        .block-1x2 {
+            grid-column: span 1;
+            grid-row: span 2;
+            background-color: #238636; /* Verde */
+        }
+        .block-2x2 {
+            grid-column: span 2;
+            grid-row: span 2;
+            background-color: #8957e5; /* Roxo */
+        }
+        .block-3x2 {
+            grid-column: span 3;
+            grid-row: span 2;
+            background-color: #db6d28; /* Laranja */
+        }
+        .block-1x1 {
+            grid-column: span 1;
+            grid-row: span 1;
+            background-color: #f85149; /* Vermelho */
+        }
+
+        /* Peças na fila (tamanho fixo) */
+        .queue-list .block {
+            position: relative;
+            opacity: 1;
+            width: 100px;
+            height: 50px;
+            font-size: 0.9rem;
+        }
+        .queue-list .block-1x1 { width: 50px; height: 50px; }
+        .queue-list .block-2x2 { width: 100px; height: 100px; }
+        .queue-list .block-3x2 { width: 150px; height: 100px; }
+
+        /* Peças no pallet (posicionamento na grade) */
+        #pallet-pieces .block.p-0-0 { grid-column-start: 1; grid-row-start: 1; }
+        #pallet-pieces .block.p-0-2 { grid-column-start: 3; grid-row-start: 1; }
+        #pallet-pieces .block.p-1-3 { grid-column-start: 4; grid-row-start: 2; }
+        #pallet-pieces .block.p-2-0 { grid-column-start: 1; grid-row-start: 3; }
+        #pallet-pieces .block.p-3-3 { grid-column-start: 4; grid-row-start: 4; }
+        /* Adicione mais posições p-X-Y se necessário */
+
+
+        /* ----- Animações ----- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.8); }
+        }
+        @keyframes flashBad {
+            0%, 100% { box-shadow: 0 0 15px 5px rgba(248, 81, 73, 0); }
+            50% { box-shadow: 0 0 15px 5px rgba(248, 81, 73, 0.7); }
+        }
+        @keyframes flashGood {
+            0%, 100% { box-shadow: 0 0 15px 5px rgba(63, 185, 80, 0); }
+            50% { box-shadow: 0 0 15px 5px rgba(63, 185, 80, 0.7); }
+        }
+
+        .block-show {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        .block-hide {
+            animation: fadeOut 0.5s ease-out forwards;
+        }
+        .pallet-fail {
+            animation: flashBad 0.8s ease 2;
+        }
+        .pallet-success {
+            animation: flashGood 0.8s ease 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Estrutura principal da simulação -->
+    <div class="simulation-container">
+        
+        <!-- Coluna Esquerda: Pallet e Status -->
+        <div class="left-column">
+            
+            <!-- Display de Status -->
+            <div id="status-display" class="problem">
+                <h2 id="status-title">O DESAFIO</h2>
+                <p id="status-text">Como paletizar a sequência de forma otimizada?</p>
+            </div>
+
+            <!-- Contêiner do Pallet 5x5 -->
+            <div class="pallet-container">
+                <!-- Fundo da grade (visual) -->
+                <div id="pallet-grid">
+                    <script>
+                        // Gera as 25 células de fundo
+                        const grid = document.getElementById('pallet-grid');
+                        for (let i = 0; i < 25; i++) {
+                            const cell = document.createElement('div');
+                            cell.className = 'grid-cell';
+                            grid.appendChild(cell);
+                        }
+                    </script>
+                </div>
+                <!-- Contêiner onde as peças reais aparecem -->
+                <div id="pallet-pieces">
+                    <!-- Peças serão adicionadas aqui via JS -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Coluna Direita: Fila de Peças -->
+        <div class="right-column">
+            <h2 id="queue-title">Fila de Pacotes</h2>
+            <div id="queue-list">
+                <!-- Peças da fila serão adicionadas aqui via JS -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Referências aos Elementos do DOM ---
+        const statusDisplay = document.getElementById('status-display');
+        const statusTitle = document.getElementById('status-title');
+        const statusText = document.getElementById('status-text');
+        const palletGrid = document.getElementById('pallet-grid');
+        const palletPieces = document.getElementById('pallet-pieces');
+        const queueList = document.getElementById('queue-list');
+
+        // --- Configuração da Simulação ---
+        const PAUSE_SHORT = 1000;  // 1 segundo
+        const PAUSE_LONG = 2500;   // 2.5 segundos
+
+        // Definição das peças e suas sequências
+        // [tipo_bloco, texto_bloco, [pos_x, pos_y]]
+        const allBlocks = {
+            'b_2x2': { class: 'block-2x2', text: '2x2', w: 2, h: 2 },
+            'b_3x2': { class: 'block-3x2', text: '3x2', w: 3, h: 2 },
+            'b_2x1_v': { class: 'block-1x2', text: '2x1 v', w: 1, h: 2 },
+            'b_2x1_h': { class: 'block-2x1', text: '2x1 h', w: 2, h: 1 },
+            'b_1x1': { class: 'block-1x1', text: '1x1', w: 1, h: 1 }
+        };
+
+        // Sequência da Tentativa "Burra"
+        const dumbAttempt = [
+            { id: 'b_3x2', pos: 'p-0-0' }, // 3x2 na pos (0,0)
+            { id: 'b_2x2', pos: 'p-0-2' }, // 2x2 na pos (0,2) - Sobrepõe! (Incorreto)
+            { id: 'b_1x1', pos: 'p-3-3' }  // 1x1 na pos (3,3)
+        ];
+
+        // Sequência da Solução "IA"
+        const aiSolution = [
+            { id: 'b_3x2', pos: 'p-0-0' },   // 3x2 na pos (0,0)
+            { id: 'b_2x2', pos: 'p-0-3' },   // 2x2 na pos (0,3) - Correto!
+            { id: 'b_1x1', pos: 'p-2-0' },   // 1x1 na pos (2,0)
+            { id: 'b_2x1_v', pos: 'p-2-1' }, // 2x1 v na pos (2,1)
+            { id: 'b_2x1_h', pos: 'p-4-0' }  // 2x1 h na pos (4,0)
+        ];
+        
+        // --- Funções Auxiliares ---
+        
+        // Promessa de pausa (para usar com async/await)
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Limpa o pallet
+        function clearPallet() {
+            palletPieces.innerHTML = '';
+            palletGrid.classList.remove('pallet-fail', 'pallet-success');
+        }
+
+        // Limpa a fila
+        function clearQueue() {
+            queueList.innerHTML = '';
+        }
+
+        // Adiciona um bloco (peça) na grade
+        function addBlock(blockId, posClass, delay) {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    const blockInfo = allBlocks[blockId];
+                    if (!blockInfo) {
+                        console.error(`Bloco ${blockId} não definido!`);
+                        resolve();
+                        return;
+                    }
+                    const blockEl = document.createElement('div');
+                    blockEl.className = `block ${blockInfo.class} ${posClass}`;
+                    blockEl.innerText = blockInfo.text;
+                    palletPieces.appendChild(blockEl);
+                    
+                    // Força o navegador a aplicar a classe antes de animar
+                    requestAnimationFrame(() => {
+                        blockEl.classList.add('block-show');
+                    });
+                    
+                    resolve();
+                }, delay);
+            });
+        }
+        
+        // Atualiza a fila de peças
+        function updateQueue(attempt) {
+            clearQueue();
+            attempt.forEach(item => {
+                const blockInfo = allBlocks[item.id];
+                if(blockInfo) {
+                    const blockEl = document.createElement('div');
+                    blockEl.className = `block ${blockInfo.class}`;
+                    blockEl.innerText = blockInfo.text;
+                    queueList.appendChild(blockEl);
+                }
+            });
+        }
+
+        // Atualiza o display de status
+        function updateStatus(title, text, style) {
+            statusTitle.innerText = title;
+            statusText.innerText = text;
+            statusDisplay.className = style; // 'problem', 'calculating', 'success'
+        }
+
+        // --- Loop Principal da Simulação ---
+        
+        async function runSimulationLoop() {
+            
+            // --- CENA 1: O PROBLEMA ---
+            clearPallet();
+            updateQueue(aiSolution); // Mostra a fila da solução boa
+            updateStatus('O DESAFIO', 'Como paletizar esta sequência de forma otimizada?', 'problem');
+            await sleep(PAUSE_LONG * 1.5);
+
+            // --- CENA 2: TENTATIVA BURRA ---
+            updateStatus('TENTATIVA "BURRA"', 'Tentando encaixar de forma ingênua...', 'calculating');
+            updateQueue(dumbAttempt);
+            
+            await addBlock(dumbAttempt[0].id, dumbAttempt[0].pos, 0);
+            await sleep(PAUSE_SHORT);
+            
+            // Esta peça vai sobrepor visualmente (simulando falha)
+            await addBlock(dumbAttempt[1].id, dumbAttempt[1].pos, 0);
+            await sleep(PAUSE_SHORT);
+
+            await addBlock(dumbAttempt[2].id, dumbAttempt[2].pos, 0);
+            await sleep(PAUSE_SHORT);
+            
+            updateStatus('FALHA', 'Tentativa instável e com sobreposição. Recompensa: -500', 'problem');
+            palletGrid.classList.add('pallet-fail');
+            await sleep(PAUSE_LONG);
+
+            // --- CENA 3: SOLUÇÃO DA IA ---
+            clearPallet();
+            updateQueue(aiSolution);
+            updateStatus('SOLUÇÃO DA IA (DRL)', 'Calculando... Maximizando Estabilidade e Densidade.', 'calculating');
+            await sleep(PAUSE_LONG);
+
+            updateStatus('SOLUÇÃO DA IA (DRL)', 'Posicionando Peça 1...', 'calculating');
+            await addBlock(aiSolution[0].id, aiSolution[0].pos, 0);
+            await sleep(PAUSE_SHORT);
+            
+            updateStatus('SOLUÇÃO DA IA (DRL)', 'Posicionando Peça 2...', 'calculating');
+            await addBlock(aiSolution[1].id, aiSolution[1].pos, 0);
+            await sleep(PAUSE_SHORT);
+            
+            updateStatus('SOLUÇÃO DA IA (DRL)', 'Posicionando Peça 3...', 'calculating');
+            await addBlock(aiSolution[2].id, aiSolution[2].pos, 0);
+            await sleep(PAUSE_SHORT);
+            
+            updateStatus('SOLUÇÃO DA IA (DRL)', 'Posicionando Peça 4...', 'calculating');
+            await addBlock(aiSolution[3].id, aiSolution[3].pos, 0);
+            await sleep(PAUSE_SHORT);
+            
+            updateStatus('SOLUÇÃO DA IA (DRL)', 'Posicionando Peça 5...', 'calculating');
+            await addBlock(aiSolution[4].id, aiSolution[4].pos, 0);
+            await sleep(PAUSE_SHORT);
+
+            // --- CENA 4: RESULTADO ---
+            updateStatus('SUCESSO', 'Pallet otimizado com sucesso! Recompensa: +1250', 'success');
+            palletGrid.classList.add('pallet-success');
+            await sleep(PAUSE_LONG * 2);
+
+            // Reinicia o loop
+            runSimulationLoop();
+        }
+
+        // Inicia a simulação quando a página carregar
+        window.onload = runSimulationLoop;
+
+    </script>
+</body>
+</html>
